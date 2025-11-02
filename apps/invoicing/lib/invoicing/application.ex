@@ -10,6 +10,7 @@ defmodule Invoicing.Application do
     children = [
       # Starts a worker by calling: Invoicing.Worker.start_link(arg)
       # {Invoicing.Worker, arg}
+      Invoicing.Repo
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

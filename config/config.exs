@@ -13,6 +13,9 @@ import Config
 config :data_oriented,
   ecto_repos: [DataOriented.Repo]
 
+config :invoicing,
+  ecto_repos: [Invoicing.Repo]
+
 # Configures the mailer
 #
 # By default it uses the "Local" adapter which stores the emails
