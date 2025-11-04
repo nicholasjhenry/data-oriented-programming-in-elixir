@@ -1,6 +1,8 @@
 defmodule Invoicing.Types do
   use TypedStruct
 
+  alias Invoicing.Records
+
   defmodule USD do
     use TypedStruct
 
@@ -8,9 +10,9 @@ defmodule Invoicing.Types do
       field :value, Decimal.t()
     end
 
-    @spec multiple(t(), Decimal.t()) :: t()
-    def multiple(usd, amount) do
-      %__MODULE__{value: Decimal.mult(usd.value, Decimal.new(amount))}
+    @spec multiply(t(), Decimal.t()) :: t()
+    def multiply(usd, amount) do
+      %__MODULE__{value: Decimal.mult(usd.value, amount)}
     end
 
     @spec zero() :: t()
@@ -28,12 +30,12 @@ defmodule Invoicing.Types do
     use TypedStruct
 
     typedstruct enforce: true do
-      field :numerator, non_negative_integer()
-      field :denominator, non_negative_integer()
+      field :numerator, non_neg_integer()
+      field :denominator, non_neg_integer()
     end
 
-    @spec new(non_negative_integer(), non_negative_integer()) :: t()
-    def new(numerator, denominator) when denominator > 0 do
+    @spec new(non_neg_integer(), non_neg_integer()) :: t()
+    def new(numerator, denominator) when denominator > 0 and numerator <= denominator do
       %__MODULE__{numerator: numerator, denominator: denominator}
     end
 
@@ -43,117 +45,128 @@ defmodule Invoicing.Types do
     end
   end
 
+  typedstruct module: CustomerId, enforce: true do
+    field :value, String.t()
+  end
 
+  typedstruct module: PastDue, enforce: true do
+    field :invoice, Records.Invoice.t()
+  end
 
+  typedstruct module: InvoiceId, enforce: true do
+    field :value, String.t()
+  end
 
-  defmodule PastDueInvoice do
-    use TypedStruct
-
-    alias Invoicing.Invoice
-
-    typedstruct enforce: true do
-      field :value, Invoice.t()
-    end
+  typedstruct module: Reason, enforce: true do
+    field :value, String.t()
   end
 
   defmodule Lifecycle do
-    defmodule Draft do
-      use TypedStruct
+    use TypedStruct
 
-      typedstruct enforce: true do
-      end
+    typedstruct module: Draft, enforce: true do
     end
 
-    defmodule Billed do
-      use TypedStruct
-
-      typedstruct enforce: true do
-        field :invoice_id, String.t()
-      end
+    typedstruct module: UnderReview, enforce: true do
+      field :id, String.t()
     end
 
-    defmodule Rejected do
-      use TypedStruct
-
-      typedstruct enforce: true do
-        field :reason, String.t()
-      end
+    typedstruct module: Billed, enforce: true do
+      field :id, InvoiceId.t()
     end
 
-    defmodule InReview do
-      use TypedStruct
-
-      typedstruct enforce: true do
-        field :approval_id, String.t()
-      end
+    typedstruct module: Rejected, enforce: true do
+      field :why, Reason.t()
     end
 
     @type t ::
             Draft.t()
+            | UnderReview.t()
             | Billed.t()
             | Rejected.t()
-            | InReview.t()
   end
 
-  defmodule Latefee do
+  defmodule LateFee do
     use TypedStruct
 
-    alias Invoicing.Invoice
+    alias Invoicing.Types.EnrichedCustomer
+    alias Invoicing.Types.InvoiceId
     alias Invoicing.Types.Lifecycle
+    alias Invoicing.Types.Reason
+    alias Invoicing.Types.USD
+    alias Invoicing.Types.PastDue
 
-    @enforce_keys [:customer_id, :usd, :state, :invoice_date, :due_date, :included_in_fee]
-    defstruct [:customer_id, :usd, :state, :invoice_date, :due_date, :included_in_fee]
+    @enforce_keys [:customer, :total, :state, :invoice_date, :due_date, :included_in_fee]
+    defstruct [:customer, :total, :state, :invoice_date, :due_date, :included_in_fee]
 
     @type t(state) :: %__MODULE__{
-            customer_id: String.t(),
-            usd: Decimal.t(),
             state: state,
-            invoice_date: NaiveDateTime.t(),
-            due_date: NaiveDateTime.t(),
-            included_in_fee: list(Invoice.t())
+            customer: EnrichedCustomer.t(),
+            total: USD.t(),
+            invoice_date: Date.t(),
+            due_date: Date.t(),
+            included_in_fee: list(PastDue.t())
           }
 
     @type t :: t(Lifecycle.t())
+
+    @spec mark_billed(t(), InvoiceId.t()) :: t(Lifecycle.Billed.t())
+    def mark_billed(late_fee, id) do
+      %{late_fee | state: %Lifecycle.Billed{id: id}}
+    end
+
+    @spec mark_not_billed(t(), Reason.t()) :: t(Lifecycle.Rejected.t())
+    def mark_not_billed(late_fee, reason) do
+      %{late_fee | state: %Lifecycle.Rejected{why: reason}}
+    end
+
+    @spec mark_as_being_reviewed(t(), String.t()) :: t(Lifecycle.UnderReview.t())
+    def mark_as_being_reviewed(late_fee, approval_id) do
+      %{late_fee | state: %Lifecycle.UnderReview{id: approval_id}}
+    end
+
+    @spec in_state(t(), Lifecycle.t()) :: t()
+    def in_state(late_fee, evidence) do
+      %{late_fee | state: evidence}
+    end
   end
 
   defmodule ReviewedFee do
-    defmodule Billable do
-      use TypedStruct
+    use TypedStruct
 
-      alias Invoicing.Types.Latefee
-      alias Invoicing.Types.Lifecycle.Draft
+    alias Invoicing.Types.LateFee
+    alias Invoicing.Types.Lifecycle.Draft
+    alias Invoicing.Types.Reason
 
-      typedstruct enforce: true do
-        field :late_fee, Latefee.t(Draft.t())
-      end
+    typedstruct module: Billable, enforce: true do
+      field :late_fee, LateFee.t(Draft.t())
     end
 
-    defmodule NeedsReview do
-      use TypedStruct
-
-      alias Invoicing.Types.Latefee
-      alias Invoicing.Types.Lifecycle.Draft
-
-      typedstruct enforce: true do
-        field :late_fee, Latefee.t(Draft.t())
-      end
+    typedstruct module: NeedsApproval, enforce: true do
+      field :late_fee, LateFee.t(Draft.t())
     end
 
-    defmodule NotBillable do
-      use TypedStruct
-
-      alias Invoicing.Types.Latefee
-      alias Invoicing.Types.Lifecycle.Draft
-
-      typedstruct enforce: true do
-        field :late_fee, Latefee.t(Draft.t())
-        field :reason, String.t()
-      end
+    typedstruct module: NotBillable, enforce: true do
+      field :late_fee, LateFee.t(Draft.t())
+      field :reason, Reason.t()
     end
 
     @type t ::
             Billable.t()
-            | NeedsReview.t()
+            | NeedsApproval.t()
             | NotBillable.t()
+  end
+
+  defmodule EnrichedCustomer do
+    use TypedStruct
+
+    alias Invoicing.Types.CustomerId
+
+    typedstruct enforce: true do
+      field :id, CustomerId.t()
+      field :address, String.t()
+      field :fee_percentage, Percentage.t()
+      # TODO: ADD Services
+    end
   end
 end
