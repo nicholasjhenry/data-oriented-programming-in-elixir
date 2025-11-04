@@ -1,4 +1,4 @@
-defmodule Invoicing.Customer do
+defmodule Invoicing.Records.Customer do
   use Ecto.Schema
   import Ecto.Changeset
 

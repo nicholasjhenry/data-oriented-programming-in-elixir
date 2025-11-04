@@ -1,4 +1,4 @@
-defmodule Invoicing.LineItem do
+defmodule Invoicing.Records.LineItem do
   use Ecto.Schema
   import Ecto.Changeset
 
