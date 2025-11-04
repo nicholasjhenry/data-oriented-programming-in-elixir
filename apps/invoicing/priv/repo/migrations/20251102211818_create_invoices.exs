@@ -4,8 +4,8 @@ defmodule Invoicing.Repo.Migrations.CreateInvoices do
   def change do
     create table(:invoices) do
       add :status, :string
-      add :invoice_date, :naive_datetime
-      add :due_date, :naive_datetime
+      add :invoice_date, :date
+      add :due_date, :date
       add :invoice_type, :string
       add :customer_id, references(:customers, on_delete: :nothing)
 
