@@ -2,6 +2,16 @@ defmodule Invoicing.Invoice do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{
+          status: :open | :close,
+          invoice_date: NaiveDateTime.t(),
+          due_date: NaiveDateTime.t(),
+          invoice_type: :latefee | :standard,
+          customer_id: integer() | nil,
+          inserted_at: NaiveDateTime.t(),
+          updated_at: NaiveDateTime.t()
+        }
+
   schema "invoices" do
     field :status, Ecto.Enum, values: [:open, :close]
     field :invoice_date, :naive_datetime
