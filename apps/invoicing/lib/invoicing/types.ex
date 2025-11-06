@@ -2,6 +2,7 @@ defmodule Invoicing.Types do
   use TypedStruct
 
   alias Invoicing.Records
+  alias Invoicing.Infrastructure.Services
 
   defmodule USD do
     use TypedStruct
@@ -166,7 +167,9 @@ defmodule Invoicing.Types do
       field :id, CustomerId.t()
       field :address, String.t()
       field :fee_percentage, Percentage.t()
-      # TODO: ADD Services
+      field :terms, Services.ContractsAPI.payment_terms()
+      field :rating, Services.RatingsAPI.customer_rating()
+      field :approval, Services.ApprovalsAPI.approval_status() | nil
     end
   end
 end
