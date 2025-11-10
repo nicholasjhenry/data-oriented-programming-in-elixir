@@ -44,7 +44,8 @@ defmodule DataOriented.MixProject do
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
       # https://github.com/saleyn/typedstruct
-      {:typedstruct, "~> 0.5"}
+      {:typedstruct, "~> 0.5"},
+      {:funx, "~> 0.1.6"}
     ]
   end
 
