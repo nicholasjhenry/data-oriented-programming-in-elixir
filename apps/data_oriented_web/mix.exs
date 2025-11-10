@@ -4,6 +4,7 @@ defmodule DataOrientedWeb.MixProject do
   def project do
     [
       app: :data_oriented_web,
+      project_name: :data_oriented,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -59,7 +60,8 @@ defmodule DataOrientedWeb.MixProject do
       {:gettext, "~> 0.26"},
       {:data_oriented, in_umbrella: true},
       {:jason, "~> 1.2"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:tidewave, "~> 0.5", only: :dev}
     ]
   end
 
