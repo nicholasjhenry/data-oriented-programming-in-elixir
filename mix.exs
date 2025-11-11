@@ -51,7 +51,11 @@ defmodule DataOriented.Umbrella.MixProject do
     [
       # run `mix setup` in all child apps
       setup: ["cmd mix setup"],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"],
+      "usage_rules.update": [
+        # --all - Gather usage rules from all dependencies that have them (includes both main rules and all sub-rules)
+        "usage_rules.sync ./AGENTS.md --all --inline usage_rules:all --link-to-folder deps"
+      ]
     ]
   end
 end
