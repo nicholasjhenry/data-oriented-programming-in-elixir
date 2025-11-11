@@ -431,4 +431,10 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 - Use `Task.async_stream/3` for concurrent enumeration with back-pressure
 
 <!-- usage_rules:otp-end -->
+<!-- funx-start -->
+## funx usage
+_funx_
+
+[funx usage rules](deps/funx/usage-rules.md)
+<!-- funx-end -->
 <!-- usage-rules-end -->
