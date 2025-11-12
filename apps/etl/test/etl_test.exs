@@ -20,4 +20,8 @@ defmodule EtlTest do
   test "list 7.1" do
     Etl.clean_duplicates(@listing_7_1) |> dbg
   end
+
+  test "list 7.2" do
+    Etl.clean_duplicates(@listing_7_2) |> dbg
+  end
 end
