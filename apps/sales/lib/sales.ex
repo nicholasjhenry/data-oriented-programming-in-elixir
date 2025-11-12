@@ -1,8 +1,10 @@
 defmodule Sales do
   @type segment :: :enterprise | :strategic | :existing | :private
-  @type sales_channel :: :direct | :partner | :reseller | :online
+  @type channel :: :direct | :partner | :reseller | :online
   @type region :: :latam | :amer | :emea
   @type country_code :: :ba | :be | :bl | :ca | :ch | :fr | :na | :us
+
+  @type attribute :: :region | :country | :sector | :segment | :channel
 
   defmodule SalesOrgId do
     use TypedStruct
@@ -28,10 +30,10 @@ defmodule Sales do
     end
   end
 
+  @type sector() :: Sector.t()
+
   defmodule Account do
     use TypedStruct
-
-    @type attribute :: :region | :country | :sector | :segment | :channel
 
     typedstruct enforce: true do
       field :id, pos_integer()
@@ -39,7 +41,7 @@ defmodule Sales do
       field :country, Sales.country_code()
       field :sector, Sales.Sector.t()
       field :segment, Sales.segment()
-      field :channel, Sales.sales_channel()
+      field :channel, Sales.channel()
     end
 
     @spec new(
@@ -48,7 +50,7 @@ defmodule Sales do
             Sales.country_code(),
             Sales.Sector.t(),
             Sales.segment(),
-            Sales.sales_channel()
+            Sales.channel()
           ) :: t()
     def new(id, region, country, sector, segment, channel) do
       %__MODULE__{
@@ -60,7 +62,68 @@ defmodule Sales do
         channel: channel
       }
     end
+
+    @spec region(t()) :: Sales.region()
+    def region(%__MODULE__{region: region}), do: region
+
+    @spec country(t()) :: Sales.country_code()
+    def country(%__MODULE__{country: country}), do: country
+
+    @spec sector(t()) :: Sales.sector()
+    def sector(%__MODULE__{sector: sector}), do: sector
+
+    @spec segment(t()) :: Sales.segment()
+    def segment(%__MODULE__{segment: segment}), do: segment
+
+    @spec channel(t()) :: Sales.channel()
+    def channel(%__MODULE__{channel: channel}), do: channel
   end
+
+  defmodule Attr do
+    @type t(value_type) :: %__MODULE__{
+            attribute: Sales.attribute(),
+            getter: (Account.t() -> value_type)
+          }
+
+    defstruct [:attribute, :getter]
+
+    def new(attribute, getter) do
+      %__MODULE__{attribute: attribute, getter: getter}
+    end
+  end
+
+  # Predefined attribute accessors
+  @spec channel() :: Attr.t(channel())
+  def channel do
+    Attr.new(:channel, &Account.channel/1)
+  end
+
+  @spec sector() :: Attr.t(sector())
+  def sector do
+    Attr.new(:sector, &Account.sector/1)
+  end
+
+  @spec country() :: Attr.t(country_code())
+  def country do
+    Attr.new(:country, &Account.country/1)
+  end
+
+  @spec region() :: Attr.t(region())
+  def region do
+    Attr.new(:region, &Account.region/1)
+  end
+
+  @spec segment() :: Attr.t(segment())
+  def segment do
+    Attr.new(:segment, &Account.segment/1)
+  end
+
+  @type attr() ::
+          Attr.t(channel())
+          | Attr.t(sector())
+          | Attr.t(country_code())
+          | Attr.t(region())
+          | Attr.t(segment())
 
   defmodule Rule do
     defmodule Result do
@@ -79,16 +142,16 @@ defmodule Sales do
     end
 
     defmodule Equals do
-      use TypedStruct
+      @type t :: %__MODULE__{
+              attr: Sales.attr(),
+              value: term()
+            }
 
-      typedstruct enforce: true do
-        field :attribute_name, Account.attribute()
-        field :value, term()
-      end
+      defstruct [:attr, :value]
 
-      @spec new(Account.attribute(), term()) :: t()
-      def new(attribute_name, value) when is_atom(attribute_name) do
-        %__MODULE__{attribute_name: attribute_name, value: value}
+      @spec new(Sales.attr(), term()) :: t()
+      def new(attr, value) do
+        %__MODULE__{attr: attr, value: value}
       end
 
       defimpl Jason.Encoder do
@@ -96,7 +159,7 @@ defmodule Sales do
           Jason.Encode.map(
             %{
               "type" => "EQ",
-              "field" => struct.attribute_name,
+              "field" => struct.attr.attribute,
               "value" => struct.value
             },
             opts
@@ -148,7 +211,19 @@ defmodule Sales do
 
     @type t :: Equals.t() | And.t() | Or.t() | Not.t()
 
-    def r_eq(attribute_name, value), do: Equals.new(attribute_name, value)
+    def r_eq(attribute_name, value) do
+      attr =
+        case attribute_name do
+          :region -> Sales.region()
+          :country -> Sales.country()
+          :sector -> Sales.sector()
+          :segment -> Sales.segment()
+          :channel -> Sales.channel()
+        end
+
+      Equals.new(attr, value)
+    end
+
     def r_and(a, b), do: And.new(a, b)
     def r_or(a, b), do: Or.new(a, b)
     def r_not(rule), do: Not.new(rule)
@@ -161,15 +236,11 @@ defmodule Sales do
       |> Enum.reduce(&r_or/2)
     end
 
-    @spec get(Account.t(), Account.attribute()) :: term()
-    def get(account, attr) do
-      Map.fetch!(account, attr)
-    end
-
     def interpret(rule, account) do
       case rule do
-        %Equals{attribute_name: field, value: value} ->
-          found = get(account, field)
+        %Equals{attr: attr, value: value} ->
+          found = attr.getter.(account)
+          field = attr.attribute
           Result.new(found == value, "#{field} == #{value}", "#{field} == #{found}")
 
         %Not{rule: rule} ->

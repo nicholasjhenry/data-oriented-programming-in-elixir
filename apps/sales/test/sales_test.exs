@@ -2,6 +2,7 @@ defmodule SalesTest do
   use ExUnit.Case
 
   alias Sales.Account
+  alias Sales.Attr
   alias Sales.Rule
   alias Sales.Sector
 
@@ -22,7 +23,7 @@ defmodule SalesTest do
   end
 
   test "JSON encoding" do
-    rule = Rule.Equals.new(:foo, "bar")
+    rule = Rule.Equals.new(Attr.new(:region, &Account.region/1), :america)
     Jason.encode(rule) |> dbg
   end
 end
