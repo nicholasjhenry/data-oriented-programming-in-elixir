@@ -2,6 +2,7 @@ defmodule SalesTest do
   use ExUnit.Case
 
   alias Sales.Account
+  alias Sales.Rule
   alias Sales.Sector
 
   test "rules" do
@@ -18,5 +19,10 @@ defmodule SalesTest do
   test "fail: rule for org 111" do
     account = Account.new(1, :emea, :ca, Sector.new("finance"), :strategic, :direct)
     Sales.rule_for_org_111(account) |> dbg
+  end
+
+  test "JSON encoding" do
+    rule = Rule.Equals.new(:foo, "bar")
+    Jason.encode(rule) |> dbg
   end
 end

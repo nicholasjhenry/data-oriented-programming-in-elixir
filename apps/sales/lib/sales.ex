@@ -75,6 +75,19 @@ defmodule Sales do
       def new(attribute_name, value) when is_atom(attribute_name) do
         %__MODULE__{attribute_name: attribute_name, value: value}
       end
+
+      defimpl Jason.Encoder do
+        def encode(struct, opts) do
+          Jason.Encode.map(
+            %{
+              "type" => "EQ",
+              "field" => struct.attribute_name,
+              "value" => struct.value
+            },
+            opts
+          )
+        end
+      end
     end
 
     defmodule And do
