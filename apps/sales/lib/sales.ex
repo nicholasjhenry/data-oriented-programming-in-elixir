@@ -63,6 +63,21 @@ defmodule Sales do
   end
 
   defmodule Rule do
+    defmodule Result do
+      use TypedStruct
+
+      typedstruct enforce: true do
+        field :matched, boolean()
+        field :expected, String.t()
+        field :found, String.t()
+      end
+
+      @spec new(boolean(), term(), term()) :: t()
+      def new(matched, expected, found) do
+        %__MODULE__{matched: matched, expected: expected, found: found}
+      end
+    end
+
     defmodule Equals do
       use TypedStruct
 
@@ -153,17 +168,33 @@ defmodule Sales do
 
     def interpret(rule, account) do
       case rule do
-        %Equals{attribute_name: attribute, value: value} ->
-          get(account, attribute) == value
+        %Equals{attribute_name: field, value: value} ->
+          found = get(account, field)
+          Result.new(found == value, "#{field} == #{value}", "#{field} == #{found}")
 
         %Not{rule: rule} ->
-          !interpret(rule, account)
+          result = interpret(rule, account)
+          Result.new(!result.matched, "NOT(#{result.expected})", "#{result.found}")
 
         %And{a: a, b: b} ->
-          interpret(a, account) and interpret(b, account)
+          result_a = interpret(a, account)
+          result_b = interpret(b, account)
+
+          Result.new(
+            result_a.matched and result_b.matched,
+            "(#{result_a.expected} AND #{result_b.expected})",
+            "(#{result_a.found} AND #{result_b.found})"
+          )
 
         %Or{a: a, b: b} ->
-          interpret(a, account) or interpret(b, account)
+          result_a = interpret(a, account)
+          result_b = interpret(b, account)
+
+          Result.new(
+            result_a.matched or result_b.matched,
+            "(#{result_a.expected} OR #{result_b.expected})",
+            "(#{result_a.found} OR #{result_b.found})"
+          )
       end
     end
   end
@@ -213,8 +244,12 @@ defmodule Sales do
       r_eq(:region, :emea)
       |> r_and(r_not(r_contains(:country, [:us, :be, :fr])))
 
-    if interpret(rule, account) do
-      SalesOrgId.new("111")
+    result = interpret(rule, account)
+
+    if result.matched do
+      {:passed, SalesOrgId.new("111"), result}
+    else
+      {:failed, result}
     end
   end
 end
