@@ -2,7 +2,19 @@ defmodule Sales do
   @type segment :: :enterprise | :strategic | :existing | :private
   @type sales_channel :: :direct | :partner | :reseller | :online
   @type region :: :latam | :amer | :emea
-  @type country_code :: :ba | :bl | :ca | :ch | :us
+  @type country_code :: :ba | :be | :bl | :ca | :ch | :fr | :na | :us
+
+  defmodule SalesOrgId do
+    use TypedStruct
+
+    typedstruct enforce: true do
+      field :value, String.t()
+    end
+
+    def new(value) when is_binary(value) do
+      %__MODULE__{value: value}
+    end
+  end
 
   defmodule Sector do
     use TypedStruct
@@ -56,11 +68,11 @@ defmodule Sales do
 
       typedstruct enforce: true do
         field :attribute_name, Account.attribute()
-        field :value, String.t()
+        field :value, term()
       end
 
-      @spec new(Account.attribute(), String.t()) :: t()
-      def new(attribute_name, value) when is_atom(attribute_name) and is_binary(value) do
+      @spec new(Account.attribute(), term()) :: t()
+      def new(attribute_name, value) when is_atom(attribute_name) do
         %__MODULE__{attribute_name: attribute_name, value: value}
       end
     end
@@ -107,6 +119,40 @@ defmodule Sales do
     end
 
     @type t :: Equals.t() | And.t() | Or.t() | Not.t()
+
+    def r_eq(attribute_name, value), do: Equals.new(attribute_name, value)
+    def r_and(a, b), do: And.new(a, b)
+    def r_or(a, b), do: Or.new(a, b)
+    def r_not(rule), do: Not.new(rule)
+    def r_any(rules), do: Enum.reduce(rules, fn r, acc -> r_or(acc, r) end)
+    def r_all(rules), do: Enum.reduce(rules, fn r, acc -> r_and(acc, r) end)
+
+    def r_contains(attribute, options) do
+      options
+      |> Enum.map(&r_eq(attribute, &1))
+      |> Enum.reduce(&r_or/2)
+    end
+
+    @spec get(Account.t(), Account.attribute()) :: term()
+    def get(account, attr) do
+      Map.fetch!(account, attr)
+    end
+
+    def interpret(rule, account) do
+      case rule do
+        %Equals{attribute_name: attribute, value: value} ->
+          get(account, attribute) == value
+
+        %Not{rule: rule} ->
+          !interpret(rule, account)
+
+        %And{a: a, b: b} ->
+          interpret(a, account) and interpret(b, account)
+
+        %Or{a: a, b: b} ->
+          interpret(a, account) or interpret(b, account)
+      end
+    end
   end
 
   @spec example_accounts() :: list(Account.t())
@@ -120,10 +166,42 @@ defmodule Sales do
     ]
   end
 
-  def example_rules do
+  def example_rule_1 do
+    import Rule
+
+    r_eq(:region, :emea)
+    |> r_and(r_eq(:segment, :public))
+    |> r_or(r_not(r_eq(:region, :latam)))
+  end
+
+  def example_rule_2 do
+    import Rule
+
     [
-      Rule.Equals.new(:region, "amer"),
-      Rule.Equals.new(:segment, "enterprise")
+      r_any([r_eq(:country, :us), r_eq(:country, :fr), r_eq(:country, :be)]),
+      r_all([r_eq(:country, :na), r_eq(:segment, :enterprise)])
     ]
+  end
+
+  def example_rule_3 do
+    import Rule
+
+    r_contains(:country, [:us, :be, :fr])
+    |> r_and(
+      r_eq(:segment, :public)
+      |> r_or(r_not(r_eq(:region, :latam)))
+    )
+  end
+
+  def rule_for_org_111(account) do
+    import Rule
+
+    rule =
+      r_eq(:region, :emea)
+      |> r_and(r_not(r_contains(:country, [:us, :be, :fr])))
+
+    if interpret(rule, account) do
+      SalesOrgId.new("111")
+    end
   end
 end
